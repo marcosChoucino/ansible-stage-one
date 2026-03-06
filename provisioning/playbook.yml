@@ -26,6 +26,20 @@
       resolved_upstream_dns: "{{ resolved_status.stdout | regex_findall('DNS Servers: (.*)') | map('trim') | join(' ') | split() }}"
     when: resolved_status.rc == 0
 
+- name: Get DNS only from MAN node
+  hosts: man
+  gather_facts: no
+
+  tasks:
+    - name: Get resolvectl status from MAN
+      command: resolvectl status
+      register: man_resolved_status
+      changed_when: false
+
+    - name: Extract DNS servers from MAN
+      set_fact:
+        man_upstream_dns: "{{ man_resolved_status.stdout | regex_findall('DNS Servers: (.*)') | map('trim') | join(' ') | split() | unique }}"
+
 - name: Gather facts from proxy-jump
   hosts: proxy-jump
 
@@ -221,6 +235,18 @@
         private_ip_address_range: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/4']
     - set_fact:
         host_interface: 'ens5'
+        
+- name: Allow MAN DNS servers before DROP rules
+      include_role:
+        name: iptables
+      vars:
+        iptables_rules:
+          - chain: FORWARD
+            destination: '{{ item }}'
+            in_interface: '{{ host_interface }}'
+            out_interface: '{{ hostvars["man"]["default_gateway_interface"] }}'
+            jump: ACCEPT
+      loop: '{{ hostvars["man"]["man_upstream_dns"] }}'
 
     - name: setup
       include_role:
