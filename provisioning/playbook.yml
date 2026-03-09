@@ -235,8 +235,8 @@
         private_ip_address_range: ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/4']
     - set_fact:
         host_interface: 'ens5'
-        
-- name: Allow MAN DNS servers before DROP rules
+
+    - name: Allow MAN DNS servers before DROP rules
       include_role:
         name: iptables
       vars:
@@ -259,7 +259,6 @@
             out_interface: '{{ hostvars["man"]["default_gateway_interface"] }}'
             jump: DROP
       loop: '{{ private_ip_address_range }}'
-
 - name: Test sandbox networking
   hosts:
   - management
