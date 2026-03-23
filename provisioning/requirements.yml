@@ -15,7 +15,7 @@
   scm: git
   version: v1.0.0
 - name: interface
-  src: https://github.com/cyberrangecz/ansible-role-interface.git
+  src: https://github.com/marcosChoucino/ansible-role-interface.git
   scm: git
   version: v1.0.2
 - name: iptables
