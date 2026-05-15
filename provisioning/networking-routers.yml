@@ -107,6 +107,20 @@
     sysctl:
       name: net.ipv4.ip_forward
       value: '{% if ip_forward %}1{% else %}0{% endif %}'
+      
+- name: Get DNS only from MAN node
+  hosts: man
+  gather_facts: no
+
+  tasks:
+    - name: Get resolvectl status from MAN
+      command: resolvectl status
+      register: man_resolved_status
+      changed_when: false
+
+    - name: Extract DNS servers from MAN
+      set_fact:
+        man_upstream_dns: "{{ man_resolved_status.stdout | regex_findall('DNS Servers: (.*)') | map('trim') | join(' ') | split() | unique }}"
 
 - name: NAT and DROP rules on MAN
   hosts: man
@@ -127,6 +141,26 @@
           chain: POSTROUTING
           out_interface: '{{ default_gateway_interface }}'
           jump: MASQUERADE
+        {% for private_ip_address_range in ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/4'] %}
+        - chain: FORWARD
+          destination: '{{ private_ip_address_range }}'
+          in_interface: 'ens5'
+          out_interface: '{{ hostvars["man"]["default_gateway_interface"] }}'
+          jump: DROP
+        {% endfor %}
+  - set_fact:
+      iptables_rules_string: |
+        - table: nat
+          chain: POSTROUTING
+          out_interface: '{{ default_gateway_interface }}'
+          jump: MASQUERADE
+        {% for dns_server in hostvars["man"]["man_upstream_dns"] %}
+        - chain: FORWARD
+          destination: '{{ dns_server }}'
+          in_interface: 'ens5'
+          out_interface: '{{ hostvars["man"]["default_gateway_interface"] }}'
+          jump: ACCEPT
+        {% endfor %}
         {% for private_ip_address_range in ['10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '224.0.0.0/4'] %}
         - chain: FORWARD
           destination: '{{ private_ip_address_range }}'
